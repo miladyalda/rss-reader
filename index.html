@@ -1,118 +1,47 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RSS Feed Reader</title>
-    <style>
-        body {
-            font-family: 'Lato', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f2f2f2;
-        }
-        
-        #feed {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #fff;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .feed-item {
-            margin-bottom: 20px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 20px;
-        }
-        
-        .feed-item h3 {
-            margin: 0;
-            font-size: 20px;
-            color: #333;
-        }
-        
-        .feed-item a {
-            text-decoration: none;
-            color: #474747 !important;
-            font-weight: 600;
-        }
-        
-        .feed-item p {
-            margin: 5px 0;
-            color: #474747 ;
-        }
-
-        .feed-item img {
-            max-width: 100px;
-            height: auto;
-            margin-top: 10px;
-        }
-
-        .feed-item .source {
-            font-style: italic;
-            color: #38ba7d;
-        }
-
-        .feed-item .date {
-            font-size: 12px;
-            color: #474747;
-        }
-    </style>
-</head>
-<body>
-    <div id="feed"></div>
-    <script>
-
 const feedUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://www.newsmachine.com/personalfeed/937aed90c2986818bd5c1f98ed0d2c4f.rss');
 
+fetch(feedUrl)
+  .then(response => response.text())
+  .then(xml => {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xml, 'text/xml');
+    const items = xmlDoc.querySelectorAll('item');
 
-        fetch(feedUrl)
-          .then(response => response.text())
-          .then(xml => {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xml, 'text/xml');
-            const items = xmlDoc.querySelectorAll('item');
-            
-            items.forEach(item => {
-              const title = item.querySelector('title').textContent;
-              const link = item.querySelector('link').textContent;
-              const description = item.querySelector('description').textContent;
-              const pubDate = new Date(item.querySelector('date').textContent).toDateString(); 
-              const source = item.querySelector('creator').textContent; 
-              
-              // Output the feed data to the HTML
-              const feedDiv = document.getElementById('feed');
-              const feedItem = document.createElement('div');
-              feedItem.classList.add('feed-item');
-              feedItem.innerHTML = `
-                <h3><a href="${link}" target="_blank">${title}</a></h3>
-                <p class="source">${source}</p>
-                <p>${description}</p>
-                <p class="date">${pubDate}</p>
-              `;
-              
-              // Fetch preview image from the linked web page
-              const imageProxy = 'https://corsproxy.io/?' + encodeURIComponent(link);
-              fetch(imageProxy)
-                .then(response => response.text())
-                .then(html => {
-                  const doc = new DOMParser().parseFromString(html, 'text/html');
-                  const metaImage = doc.querySelector('meta[property="og:image"]');
-                  const imageUrl = metaImage ? metaImage.getAttribute('content') : null;
-                  if (imageUrl) {
-                    const img = document.createElement('img');
-                    img.src = imageUrl;
-                    img.alt = title;
-                    feedItem.insertBefore(img, feedItem.firstChild);
-                  }
-                })
-                .catch(error => console.error('Error fetching linked page:', error));
-              
-              feedDiv.appendChild(feedItem);
-            });
-          })
-          .catch(error => console.error('Error fetching RSS feed:', error));
-    </script>
-</body>
-</html>
+    items.forEach(item => {
+      const title = item.querySelector('title')?.textContent || 'No title';
+      const link = item.querySelector('link')?.textContent || '#';
+      const description = item.querySelector('description')?.textContent || '';
+      const pubDateRaw = item.querySelector('pubDate')?.textContent || '';
+      const pubDate = pubDateRaw ? new Date(pubDateRaw).toDateString() : '';
+      const source = item.querySelector('creator')?.textContent || 'NewsMachine';
+
+      const feedDiv = document.getElementById('feed');
+      const feedItem = document.createElement('div');
+      feedItem.classList.add('feed-item');
+      feedItem.innerHTML = `
+        <h3><a href="${link}" target="_blank">${title}</a></h3>
+        <p class="source">${source}</p>
+        <p>${description}</p>
+        <p class="date">${pubDate}</p>
+      `;
+
+      // Optional: try loading preview image
+      const imageProxy = 'https://corsproxy.io/?' + encodeURIComponent(link);
+      fetch(imageProxy)
+        .then(response => response.text())
+        .then(html => {
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          const metaImage = doc.querySelector('meta[property="og:image"]');
+          const imageUrl = metaImage?.getAttribute('content');
+          if (imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.alt = title;
+            feedItem.insertBefore(img, feedItem.firstChild);
+          }
+        }).catch(error => console.warn('Image preview failed:', error));
+
+      feedDiv.appendChild(feedItem);
+    });
+  })
+  .catch(error => console.error('Error loading RSS feed:', error));
